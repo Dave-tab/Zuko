@@ -134,6 +134,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Student Profile Trigger Card in Sidebar (D11, FR-005) */}
+      
+      {/* Student Profile Trigger Card in Sidebar (D11, FR-005) */}
       <div className="mt-auto pt-6 border-t border-slate-100">
         <button
           onClick={onOpenProfile}
@@ -141,20 +143,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="Click to view and edit student profile"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={profile.avatarUrl}
-              alt={profile.name}
-              className="w-9 h-9 rounded-xl object-cover border border-emerald-200 shrink-0"
-            />
+            {profile.avatarUrl?.trim() ? (
+              <img
+                src={profile.avatarUrl.trim()}
+                alt={profile.name?.trim() || "Student"}
+                className="h-10 w-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-600">
+                {profile.name?.trim()?.charAt(0).toUpperCase() || "S"}
+              </div>
+            )}
+
             <div className="min-w-0">
               <p className="text-xs font-bold text-slate-900 truncate group-hover:text-emerald-800">
-                {profile.name}
+                {profile.name || "Student"}
               </p>
               <p className="text-[10px] text-slate-400 truncate">
-                {profile.major}
+                {profile.major || "Student Profile"}
               </p>
             </div>
           </div>
+
           <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 shrink-0" />
         </button>
       </div>

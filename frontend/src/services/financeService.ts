@@ -12,14 +12,14 @@ import {
  * Verified Initial Student Profile
  */
 export const initialStudentProfile: StudentProfile = {
-  name: 'David Ayantade',
-  university: 'University of Lagos (UNILAG)',
-  major: 'Computer Science',
-  year: 'Year 3 (Penultimate)',
-  semester: 'First Semester 2026/2027',
-  avatarUrl: '/src/assets/images/student_user_avatar_1791964531534.jpg',
-  email: 'd.ayantade@student.unilag.edu.ng',
-  matricNumber: '210805044',
+  name: '',
+  university: '',
+  major: '',
+  year: '',
+  semester: '',
+  avatarUrl: '',
+  email: '',
+  matricNumber: '',
 };
 
 /**

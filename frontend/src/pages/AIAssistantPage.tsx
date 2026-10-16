@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { AIInsight, Transaction, Budget, FinancialGoal } from '../types/finance';
 import { formatNaira, calculateBudgetStatus } from '../utils/financeCalculations';
+import { getDemoAIResponse } from '../data/demoAIResponses';
+
 
 interface AIAssistantPageProps {
   insights: AIInsight[];
@@ -54,12 +56,12 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   ]);
   const [inputVal, setInputVal] = useState('');
 
-  const quickPrompts = [
-    'How much do I have left in Food & Dining?',
-    'What was my largest expenditure this month?',
-    'How close am I to my MacBook Air goal?',
-    'Give me a tip to save on campus utilities',
-  ];
+const quickPrompts = [
+  'How am I spending my money this month?',
+  'Where can I reduce spending?',
+  'How much did I spend on food?',
+  'Give me a weekly budget',
+];
 
   const handleSend = (text: string) => {
     if (!text.trim()) return;
@@ -75,64 +77,18 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
     setInputVal('');
 
     // Generate responsive student finance answers based on real current state
-    setTimeout(() => {
-      let reply = "I'm analyzing your semester ledger records...";
-      const q = text.toLowerCase();
+setTimeout(() => {
+  const demoResponse = getDemoAIResponse(text);
 
-      if (q.includes('food') || q.includes('dining')) {
-        const foodBudget = budgets.find((b) => b.category === 'Food & Dining');
-        const spent = transactions
-          .filter((t) => t.category === 'Food & Dining' && t.is_budget_eligible)
-          .reduce((acc, t) => acc + t.amount, 0);
-        const limit = foodBudget?.limit || 42000;
-        const remaining = limit - spent;
-        const pct = Math.min(100, Math.round((spent / limit) * 100));
+  const aiMsg: Message = {
+    id: `ai-${Date.now()}`,
+    sender: 'ai',
+    text: demoResponse.response,
+    timestamp: 'Just now',
+  };
 
-        reply = `You currently have ${formatNaira(
-          remaining
-        )} remaining in your Food & Dining budget (${formatNaira(
-          spent
-        )} spent of your ${formatNaira(limit)} limit). You have utilized ${pct}% of your envelope for this month.`;
-      } else if (q.includes('largest') || q.includes('big') || q.includes('highest')) {
-        const sorted = [...transactions]
-          .filter((t) => t.type === 'expense')
-          .sort((a, b) => b.amount - a.amount);
-        const top = sorted[0];
-        if (top) {
-          reply = `Your largest single expense this month was ${formatNaira(
-            top.amount
-          )} for "${top.title}" on ${top.date} (${top.category}).`;
-        }
-      } else if (q.includes('macbook') || q.includes('laptop') || q.includes('goal')) {
-        const laptopGoal = goals.find((g) => g.title.toLowerCase().includes('macbook') || g.title.toLowerCase().includes('laptop')) || goals[0];
-        if (laptopGoal) {
-          const pct = Math.round((laptopGoal.currentAmount / laptopGoal.targetAmount) * 100);
-          reply = `Your ${laptopGoal.title} has ${formatNaira(
-            laptopGoal.currentAmount
-          )} saved toward the ${formatNaira(laptopGoal.targetAmount)} target (${pct}% complete).`;
-        }
-      } else if (q.includes('tip') || q.includes('utilit') || q.includes('save')) {
-        reply =
-          'Tip: Purchasing your 100GB monthly student data pack upfront saved you ~₦4,200 compared to daily micro-recharges. Sharing senior-year PDF reserves for CSC 301 can also save an estimated ₦15,000 next semester.';
-      } else {
-        const overCount = budgets.filter((b) => {
-          const spent = transactions
-            .filter((t) => t.category === b.category && t.is_budget_eligible)
-            .reduce((acc, t) => acc + t.amount, 0);
-          return spent > b.limit;
-        }).length;
-
-        reply = `I have received your query: "${text}". Based on your ₦125,000.00 wallet balance and ${budgets.length} active budgets, your financial position is stable with ${overCount} over-budget alert.`;
-      }
-
-      const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: reply,
-        timestamp: 'Just now',
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    }, 450);
+  setMessages((previous) => [...previous, aiMsg]);
+}, 450);
   };
 
   return (

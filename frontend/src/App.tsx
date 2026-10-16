@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   initialStudentProfile,
-  initialTransactions,
   initialBudgets,
   initialGoals,
   initialAIInsights,
   initialNotifications,
   financeService,
 } from './services/financeService';
+
+import { getSavedTransactions, saveTransaction } from './services/backendApi';
 import {
   Transaction,
   Budget,
@@ -30,6 +31,33 @@ import { ProfileModal } from './components/profile/ProfileModal';
 import { NotificationsPopover } from './components/notifications/NotificationsPopover';
 import { FloatingAskZukoModal } from './components/assistant/FloatingAskZukoModal';
 import { ToastContainer, ToastMessage } from './components/shared';
+import {
+  loadStudentProfile,
+  saveStudentProfile,
+  uploadStudentAvatar,
+  logoutStudent,
+} from './services/profileService';
+
+
+function calculateDemoWalletBalance(transactions: Transaction[]): number {
+  const openingBalance = 125000;
+
+  const transactionImpact = transactions
+    .filter((tx) => tx.status === 'settled')
+    .reduce((balance, tx) => {
+      if (tx.type === 'income' || tx.type === 'deposit') {
+        return balance + tx.amount;
+      }
+
+      if (tx.type === 'expense' || tx.type === 'withdrawal') {
+        return balance - tx.amount;
+      }
+
+      return balance;
+    }, 0);
+
+  return Math.round((openingBalance + transactionImpact) * 100) / 100;
+}
 
 export default function App() {
   // Navigation View State (Approved 5-Destination Layout - D11)
@@ -37,7 +65,7 @@ export default function App() {
 
   // Core Financial State synchronized with IFinanceService (D07)
   const [profile, setProfile] = useState<StudentProfile>(initialStudentProfile);
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>(initialBudgets);
   const [goals, setGoals] = useState<FinancialGoal[]>(initialGoals);
   const [insights] = useState<AIInsight[]>(initialAIInsights);
@@ -61,17 +89,60 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  useEffect(() => {
-    financeService
-      .getWalletBalance()
-      .then((balance) => {
-        setWalletBalance(balance);
-      })
-      .catch((err) => {
-        console.error('Failed to load wallet balance', err);
-        addToast('error', 'Unable to retrieve wallet balance.', 'Service Error');
-      });
-  }, []);
+
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadAppData() {
+    try {
+      const loadedProfile = await loadStudentProfile();
+
+      if (!cancelled) {
+        setProfile(loadedProfile);
+      }
+    } catch (error) {
+      if (!cancelled) {
+        console.error('Failed to load student profile:', error);
+        addToast(
+          'error',
+          'Could not load your student profile.',
+          'Profile Loading Failed',
+        );
+      }
+    }
+
+    try {
+      const savedTransactions = await getSavedTransactions();
+
+      if (!cancelled) {
+        setTransactions(savedTransactions);
+      }
+    } catch (error) {
+      if (!cancelled) {
+        console.error('Failed to load transactions:', error);
+        addToast(
+          'error',
+          'Could not load your saved transactions. Check your login and backend connection.',
+          'Loading Failed',
+        );
+      }
+    }
+  }
+
+  void loadAppData();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+
+useEffect(() => {
+  setWalletBalance({
+    available_balance: calculateDemoWalletBalance(transactions),
+    currency: 'NGN',
+  });
+}, [transactions]);
 
   const handleRefreshWallet = () => {
     financeService
@@ -108,18 +179,77 @@ export default function App() {
   };
 
   // Profile Mutation Handler (D10, D11)
-  const handleUpdateProfile = (updatedFields: Partial<StudentProfile>) => {
-    financeService
-      .updateProfile(updatedFields)
-      .then((updated) => {
-        setProfile(updated);
-        addToast('success', 'Your student profile information has been saved.', 'Profile Updated');
-      })
-      .catch((err) => {
-        console.error('Failed to update profile', err);
-        addToast('error', 'Could not save profile updates.', 'Update Failed');
-      });
-  };
+
+const handleUpdateProfile = async (
+  updated: Partial<StudentProfile>,
+) => {
+  console.log('handleUpdateProfile called:', updated);
+
+  try {
+    const updatedProfile = await saveStudentProfile(updated);
+    setProfile(updatedProfile);
+
+    addToast(
+      'success',
+      'Your profile has been updated.',
+      'Profile Updated',
+    );
+  } catch (error) {
+    console.error('Profile update failed:', error);
+
+    addToast(
+      'error',
+      error instanceof Error ? error.message : 'Could not update your profile.',
+      'Update Failed',
+    );
+
+    throw error;
+  }
+};
+
+  
+const handleUploadAvatar = async (file: File) => {
+  try {
+    const avatarUrl = await uploadStudentAvatar(file);
+
+    setProfile((current) => ({
+      ...current,
+      avatarUrl,
+    }));
+
+    addToast(
+      'success',
+      'Your profile picture has been updated.',
+      'Upload Successful',
+    );
+  } catch (error) {
+    addToast(
+      'error',
+      error instanceof Error
+        ? error.message
+        : 'Could not upload your profile picture.',
+      'Upload Failed',
+    );
+
+    throw error;
+  }
+};
+
+const handleLogout = async () => {
+  try {
+    await logoutStudent();
+    window.location.assign('/login');
+  } catch (error) {
+    console.error('Failed to log out:', error);
+
+    addToast(
+      'error',
+      error instanceof Error ? error.message : 'Could not log out.',
+      'Logout Failed',
+    );
+  }
+};
+
 
   // Notification Handlers (D11, FR-006)
   const handleMarkNotificationRead = (id: string) => {
@@ -285,22 +415,29 @@ export default function App() {
       });
   };
 
-  const handleAddTransaction = (newTx: Omit<Transaction, 'id'>) => {
-    financeService
-      .createTransaction(newTx)
-      .then((created) => {
-        setTransactions((prev) => [created, ...prev]);
-        addToast(
-          'success',
-          `${created.title} (${formatNaira(created.amount)}) recorded to campus ledger.`,
-          'Transaction Logged'
-        );
-      })
-      .catch((err) => {
-        console.error('Failed to create transaction', err);
-        addToast('error', 'Failed to record transaction.', 'Operation Failed');
-      });
-  };
+const handleAddTransaction = (newTx: Omit<Transaction, 'id'>) => {
+  saveTransaction(newTx)
+    .then((created) => {
+      setTransactions((previous) => [created, ...previous]);
+
+      addToast(
+        'success',
+        `${created.title} (${formatNaira(created.amount)}) saved successfully.`,
+        'Transaction Saved',
+      );
+    })
+    .catch((error) => {
+      console.error('Failed to save transaction:', error);
+
+      addToast(
+        'error',
+        error instanceof Error
+          ? error.message
+          : 'Failed to save transaction.',
+        'Operation Failed',
+      );
+    });
+};
 
   const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
 
@@ -382,12 +519,14 @@ export default function App() {
       )}
 
       {/* Modals & Overlays (D11, FR-005, FR-006) */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        profile={profile}
-        onSaveProfile={handleUpdateProfile}
-      />
+<ProfileModal
+  isOpen={isProfileModalOpen}
+  onClose={() => setIsProfileModalOpen(false)}
+  profile={profile}
+  onSaveProfile={handleUpdateProfile}
+  onUploadAvatar={handleUploadAvatar}
+  onLogout={handleLogout}
+/>
 
       <NotificationsPopover
         isOpen={isNotificationsOpen}
