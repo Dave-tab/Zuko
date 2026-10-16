@@ -109,7 +109,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Transaction Ledger
+              Transactions Ledger
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
